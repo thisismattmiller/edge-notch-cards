@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en" >
+<!--   data-theme="light" -->
+
+  <head>
+
+    <!-- 
+      This is the main Handlebars template for the site 
+      - When the user visits the homepage or submits a choice the app calls the endpoints in server.js
+      - The server script passes data in here and the Handlebars code builds it into the HTML page
+    -->
+
+    <meta charset="utf-8" />
+    <link rel="icon" href="https://glitch.com/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Edge Notched</title>
+
+    <!-- Meta tags for SEO and social sharing -->
+    <link rel="canonical" href="{{seo.url}}">
+    <meta name="description" content="{{seo.description}}">
+    <meta property="og:title" content="{{seo.title}}">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{seo.url}}">
+    <meta property="og:description" content="{{seo.description}}">
+    <meta property="og:image" content="{{seo.image}}">
+    <meta name="twitter:card" content="summary">
+
+    <!-- Import the webpage's stylesheet -->
+    <link rel="stylesheet" href="/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+    >
+  </head>
+  <body>
+    
+      <style>
+        .image-col{
+          min-height:100vh;
+          text-align:center;
+        }
+        .image-col h1{
+          font-size:5vw;
+        }
+        h1{
+          text-align:center;
+        }
+      </style>
+
+      <div id="app">
+      <div class="columns">
+        
+        <div class="column image-col" ref="imagecol">
+
+          <template v-if="loading == true">
+            <h1 >
+              \{{loadingEmojis[Math.floor(Math.random()*loadingEmojis.length)]}}Loading...
+            </h1>
+          </template>
+        </div>
+        <div class="column is-two-fifths">
+
+          <div class="tabs is-medium">
+            <ul>
+              <li :class="{'is-active':showCard}"><a @click="showCard = true; showStatus=false">This Card</a></li>
+              <li :class="{'is-active':showStatus}"><a @click="showCard = false; showStatus=true; updateStatus()">All Cards</a></li>
+              <li ><a target="_blank" href="/download">Data</a></li>
+
+            </ul>
+          </div>          
+          
+          <template v-if="showCard">
+            
+            <h1 class="is-size-3">
+                <span v-if="saved">[SAVED]</span>
+                \{{activeCard.filename}}<span v-if="activeCard.complete==1">[COMPLETE]</span>
+
+            </h1>
+
+            <input v-for="(name, index) in activeCard.names"
+              class="input is-medium"
+              @change="saved=false"
+              @keypress="saved=false"  
+              type="text"
+              placeholder=""
+              v-model="activeCard.names[index]"
+            />
+            <div v-if="activeCard.names.length==0">
+              No Name Text Detected
+            </div>
+            <button class="button is-small" @click="activeCard.names.push('')">+ Add Name Field</button>
+
+            <div class="buttons" style="margin-top:3em; text-align:right">
+              <button class="button is-info" @click="save(false)">Save as Incomplete</button>
+              <button class="button is-success"  @click="save('complete')">Save as Complete</button>
+              <button class="button "  @click="getWork">Another Card</button>
+
+            </div>
+
+            
+            
+          </template>
+          <template v-else>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Status</th>
+
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="card in cardsStatus">
+                  <td>
+                    <a href="" @click.prevent="loadCard(card.id)" title="">\{{card.filename}}</a>
+                  </td>
+                  <td>\{{card.status}}</td>
+
+                </tr>                
+              </tbody>
+            </table>           
+            
+            
+          </template>
+          
+
+          
+        </div>      
+
+      </div>
+    
+      </div>
+
+      <script type="module">
+        import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+
+        createApp({
+          
+          data() {
+            return {
+              message: 'Hello Vue!',
+              loading: true,
+              loadingEmojis: ['😴','🫡','🫨','😺'],
+              
+              showCard: true,
+              showStatus: false,
+              saved:false,
+              
+              cardsStatus: [],
+              
+              activeCard: {
+                "id": null,
+                "filename": null,
+                "names": "[]",
+                "complete": 0,
+                "touch": null
+              }
+            }
+          },
+
+          
+          
+          methods:{
+            
+            async getWork(){
+              
+              let req = await fetch('/work')
+              let data = await req.json()
+
+              if (data === false){
+                alert("No more work to do :)")
+                return false
+              }
+              this.activeCard = data
+              this.activeCard.names = JSON.parse(this.activeCard.names)
+              
+              // this.$refs['imagecol'].style.=":"
+              
+              this.$refs['imagecol'].style.backgroundImage = `url(https://thisismattmiller.s3.amazonaws.com/edge-notch-cards/${data.filename}.jpg)`
+              this.$refs['imagecol'].style.backgroundPosition = "center 138px"
+              this.$refs['imagecol'].style.backgroundRepeat = "no-repeat"
+              this.$refs['imagecol'].style.backgroundSize = "contain"
+
+              
+              this.loading=false
+              this.saved=false
+              
+              
+              
+            },
+            
+            async save(type){
+              
+              
+              let url = '/save'
+              if (!type){
+                url = '/save'
+                this.activeCard.complete=0
+                
+              }else if (type == 'complete'){
+                url = '/savecomplete'
+                this.activeCard.complete=1
+              }else if (type == 'incomplete'){
+                url = '/saveincomplete'
+              }
+              
+              
+              this.activeCard.names = this.activeCard.names.filter((v)=>{
+                if (v.trim() == ''){
+                  return false
+                }else{
+                  return true
+                }
+              })
+
+              try{
+                const response = await fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(this.activeCard)
+                });            
+              }catch{
+                alert("Did not save!")
+                return false
+              }
+              this.saved=true
+
+
+            },            
+            async loadCard(id){
+
+              let req = await fetch('/card?id='+id)
+              let data = await req.json()
+              this.activeCard = data
+              this.activeCard.names = JSON.parse(this.activeCard.names)
+              this.showCard = true; 
+              this.showStatus=false
+              
+              this.$refs['imagecol'].style.backgroundImage = `url(https://thisismattmiller.s3.amazonaws.com/edge-notch-cards/${data.filename}.jpg)`
+              this.$refs['imagecol'].style.backgroundPosition = "center 138px"
+              this.$refs['imagecol'].style.backgroundRepeat = "no-repeat"
+              this.$refs['imagecol'].style.backgroundSize = "contain"
+              this.saved=false
+              
+  
+
+            },       
+            
+            
+            
+            
+            
+            
+            updateStatus(){
+              
+              fetch('/status')
+              .then((resp)=>{ return resp.json()})
+              .then((json) =>{
+                this.cardsStatus= json
+                
+              })
+
+              
+              
+            }
+            
+            
+            
+          },
+          
+
+          
+          created(){
+            
+            this.getWork()
+            
+            
+            
+          }
+        }).mount('#app')
+        
+        
+      </script>    
+
+
+
+  </body>
+
+</html>
